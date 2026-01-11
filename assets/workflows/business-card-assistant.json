@@ -1,0 +1,598 @@
+{
+  "name": "名片助手(line@)",
+  "nodes": [
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.body.events[0].message.text }}",
+        "options": {
+          "systemMessage": "=你是智慧名片管理助手。可以協助:\n\n1. **查詢名片資料** - 使用 Google Sheets 工具查詢名片資料庫\n2. **回答相關問題** - 根據查詢結果提供資訊\n3. **引導用戶使用系統** - 協助用戶了解如何使用\n\n---\n\n## 查詢功能說明\n\n當用戶想查詢名片時（例如:「查詢張三」、「找ABC公司的人」、「有沒有大豐環保的聯絡人」），請使用 Google Sheets 工具進行查詢。\n\n**查詢步驟:**\n1. 從用戶訊息中提取關鍵字（姓名、公司名等）\n2. 使用 Google Sheets 工具查詢(每次請求都要查詢過一次google sheets)\n3. 將查詢結果以清晰易讀的格式回覆給用戶\n\n**回覆格式範例:**\n```\n找到 [姓名] 的資料:\n\n📇 姓名: XXX\n🏢 公司: XXX\n💼 職稱: XXX\n📱 手機: XXX\n☎️ 公司電話: XXX\n📍 地址: XXX\n📧 Email: XXX\n```\n\n如果找不到資料,請禮貌地告知用戶,並建議:\n- 確認姓名或公司名稱是否正確\n- 嘗試用其他關鍵字查詢\n- 或者直接拍攝名片圖片來新增資料\n\n---\n\n## 注意事項\n\n- 查詢時要有禮貌且專業\n- 如果查詢結果有多筆,請列出所有相關結果\n- 回覆時使用清晰的格式,方便用戶閱讀"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.1,
+      "position": [
+        208,
+        1472
+      ],
+      "id": "d6531ffc-e32a-4ca2-816a-d260512c6e43",
+      "name": "AI Agent (查詢與對話)"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "text-message",
+              "leftValue": "={{ $json.body.events[0].message.type }}",
+              "rightValue": "text",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -256,
+        1728
+      ],
+      "id": "2d11b992-3d22-4690-886e-7fe36bb1bf3a",
+      "name": "判斷訊息類型1"
+    },
+    {
+      "parameters": {
+        "url": "=https://api-data.line.me/v2/bot/message/{{ $json.body.events[0].message.id }}/content",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -32,
+        1872
+      ],
+      "id": "f60426e7-918e-4fe0-8c68-e39ee360fc4f",
+      "name": "取得圖片1",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "hAqqSLtWsACu9yBq",
+          "name": "哈哈笑你哈哈哈哈"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "image",
+        "operation": "analyze",
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.0-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.0-flash"
+        },
+        "text": "=請識別這張名片中的所有資訊，並以JSON格式回傳：\n{\n  \"公司名稱\": \"\",\n  \"姓名\": \"\",\n  \"職稱\": \"\",\n  \"手機電話\": \"\",\n  \"公司電話\": \"\",\n  \"地址\": \"\",\n  \"email\": \"\"\n}\n如果某個欄位無法識別，請填入空字串。",
+        "inputType": "binary",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1,
+      "position": [
+        192,
+        1872
+      ],
+      "id": "00cf2a2b-0637-4587-aa31-c0a1a11989e0",
+      "name": "Gemini OCR 識別1",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "1h781B9U5c9IZuiP",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 解析 Gemini OCR 結果\nconst geminiResponse = $input.first().json;\nlet cardData = {};\n\ntry {\n  // 從 Gemini 回應中提取 JSON\n  const text = geminiResponse.content?.parts?.[0]?.text || geminiResponse.text || '';\n  \n  // 嘗試提取 JSON 部分\n  const jsonMatch = text.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    cardData = JSON.parse(jsonMatch[0]);\n  } else {\n    // 如果無法解析，建立空的資料結構\n    cardData = {\n      公司名稱: '',\n      姓名: '',\n      職稱: '',\n      手機電話: '',\n      公司電話: '',\n      地址: '',\n      email: '',\n      網站: ''\n    };\n  }\n} catch (error) {\n  console.error('解析錯誤:', error);\n  cardData = {\n    公司名稱: '',\n    姓名: '',\n    職稱: '',\n    手機電話: '',\n    公司電話: '',\n    地址: '',\n    email: '',\n    網站: ''\n  };\n}\n\n// 加入額外資訊\nconst eventData = $('LINE Webhook 觸發器').first().json;\ncardData.userId = eventData.body.events[0].source.userId;\ncardData.replyToken = eventData.body.events[0].replyToken;\ncardData.timestamp = new Date().toISOString();\ncardData.來源 = 'LINE圖片';\n\nreturn [{\n  json: cardData\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        1872
+      ],
+      "id": "c94a5afa-8874-4025-a799-5c05e5819be3",
+      "name": "解析 OCR 結果1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 格式化回覆訊息\nconst input = $input.first().json;\nconst webhookData = $('LINE Webhook 觸發器').first().json;\n\nlet replyMessage = '';\nlet replyToken = webhookData.body.events[0].replyToken;\n\n// 判斷是哪條路徑\nif (input.output) {\n  // ===== AI Agent 路徑 =====\n  replyMessage = typeof input.output === 'string' ? input.output : JSON.stringify(input.output);\n} else if (input.姓名 || input.公司名稱) {\n  // ===== 圖片 OCR 路徑 =====\n  let displayName = '';\n  \n  if (input.公司名稱 && input.姓名) {\n    // 有公司名和姓名\n    displayName = `${input.公司名稱} ${input.姓名}`;\n  } else if (input.公司名稱) {\n    // 只有公司名\n    displayName = input.公司名稱;\n  } else if (input.姓名) {\n    // 只有姓名\n    displayName = input.姓名;\n  } else {\n    // 都沒有\n    displayName = '未知';\n  }\n  \n  replyMessage = `處理完成:已新增${displayName}的名片`;\n} else {\n  // ===== 預設回覆 =====\n  replyMessage = '處理完成';\n}\n\n// 確保訊息不為空\nif (!replyMessage) {\n  replyMessage = '處理完成';\n}\n\n// 只清理可能導致 JSON 錯誤的字符,但保留換行符號\nreplyMessage = String(replyMessage)\n  .replace(/\\\\/g, '\\\\\\\\')  // 反斜線\n  .replace(/\"/g, '\\\\\"');   // 雙引號\n  // 移除了對 \\n, \\r, \\t 的轉義,讓 LINE 能正確顯示換行\n\nreturn [{\n  json: {\n    replyToken: replyToken,\n    replyMessage: replyMessage\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        1712
+      ],
+      "id": "f6d38f5b-6af3-498b-a3a2-525863b4d305",
+      "name": "格式化回覆1"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        176,
+        1696
+      ],
+      "id": "efe50c8e-33fc-4d25-aa97-96dbf8cdd4a3",
+      "name": "Gemini 模型1",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "1h781B9U5c9IZuiP",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('LINE Webhook 觸發器').item.json.body.events[0].source.userId }}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        304,
+        1696
+      ],
+      "id": "4cca461a-f110-4825-a071-5a4c606d4e71",
+      "name": "Simple Memory2"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "15Wa7I0qsCsk38gTPXmdkKu0SHpJ4kAU7b-VoK0vKsgo",
+          "mode": "list",
+          "cachedResultName": "n8n-haha",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/15Wa7I0qsCsk38gTPXmdkKu0SHpJ4kAU7b-VoK0vKsgo/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1137796830,
+          "mode": "list",
+          "cachedResultName": "name_card",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/15Wa7I0qsCsk38gTPXmdkKu0SHpJ4kAU7b-VoK0vKsgo/edit#gid=1137796830"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "手機電話": "={{ $json['手機電話'] }}",
+            "姓名": "={{ $json['姓名'] }}",
+            "公司名稱": "={{ $json['公司名稱'] }}",
+            "職稱": "={{ $json['職稱'] }}",
+            "公司電話": "={{ $json['公司電話'] }}",
+            "地址": "={{ $json['地址'] }}",
+            "email": "={{ $json.email }}",
+            "最後更新時間": "={{ $json.timestamp }}",
+            "修改人": "={{ $json.userId }}"
+          },
+          "matchingColumns": [
+            "手機電話"
+          ],
+          "schema": [
+            {
+              "id": "公司名稱",
+              "displayName": "公司名稱",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "姓名",
+              "displayName": "姓名",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "職稱",
+              "displayName": "職稱",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "手機電話",
+              "displayName": "手機電話",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "公司電話",
+              "displayName": "公司電話",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "地址",
+              "displayName": "地址",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "最後更新時間",
+              "displayName": "最後更新時間",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "修改人",
+              "displayName": "修改人",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        640,
+        1872
+      ],
+      "id": "50890813-442e-4f6f-a677-976fbc045dee",
+      "name": "儲存到 Google Sheets",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "6wUJ6Goo93XlixiL",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "bcard",
+        "options": {}
+      },
+      "id": "0c38b054-f2ae-4c9f-82a2-9823b358b733",
+      "name": "LINE Webhook 觸發器",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -480,
+        1728
+      ],
+      "webhookId": "915a69cd-ac3f-4499-a0b4-e6bc3019a3b7"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.line.me/v2/bot/message/reply",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{\n  JSON.stringify({\n    replyToken: $('LINE Webhook 觸發器').item.json.body.events[0].replyToken,\n    messages: [{\n      type: \"text\",\n      text: $json.replyMessage\n    }]\n  })\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1136,
+        1712
+      ],
+      "id": "6bf5c2e6-de8a-45e4-9758-478054fafc76",
+      "name": "reply",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "hAqqSLtWsACu9yBq",
+          "name": "哈哈笑你哈哈哈哈"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "15Wa7I0qsCsk38gTPXmdkKu0SHpJ4kAU7b-VoK0vKsgo",
+          "mode": "list",
+          "cachedResultName": "n8n-haha",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/15Wa7I0qsCsk38gTPXmdkKu0SHpJ4kAU7b-VoK0vKsgo/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1137796830,
+          "mode": "list",
+          "cachedResultName": "name_card",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/15Wa7I0qsCsk38gTPXmdkKu0SHpJ4kAU7b-VoK0vKsgo/edit#gid=1137796830"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.6,
+      "position": [
+        448,
+        1680
+      ],
+      "id": "b2c7ac3a-84cf-4791-b964-91808ffb3579",
+      "name": "Get row(s) in sheet in Google Sheets",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "JCMhIRKtEbCRjmZp",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "### ⚠️ 必須設定\n\n1. **複製 Webhook URL**\n   - 啟動 workflow 後要在Line@改成「Production URL」\n\n2. **設定到 LINE@ Messaging API**",
+        "height": 368,
+        "width": 224
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -544,
+        1520
+      ],
+      "typeVersion": 1,
+      "id": "2c25239f-2c59-4073-8159-f7e87d964312",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "### 功能\n- 處理用戶的文字查詢\n- 使用 Google Sheets 工具查詢名片資料\n- 記憶對話歷史(透過 Simple Memory)\n- 提供智慧回應\n\n### ⚠️ 必須連接\n確保以下節點已正確連接到此 AI Agent:\n- ✅ **Gemini 模型1** (要新增API憑證)\n- ✅ **Google Sheets 查詢工具** (document和sheet設定成和\"儲存到Google Sheets\"的節點同一個地方)\n\n\n### 可自訂設定\n**修改 System Message** 來調整 AI 行為:\n- AI 的回應語氣(專業/親切/簡潔)\n- 查詢結果的呈現格式\n- 特殊的處理邏輯\n### 📝 注意事項\n- Input 設定為: `={{ $json.body.events[0].message.text }}`\n- 如果 AI 回應不如預期,檢查 System Message 的指示是否清楚\n- 可以在 System Message 中加入具體範例",
+        "height": 880,
+        "width": 528
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        96,
+        944
+      ],
+      "typeVersion": 1,
+      "id": "21a313de-b5b5-4e95-8a9c-f9436706d5b7",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "\n\n\n\n\n\n\n\n\n\n\n### ⚠️ 必須設定\n\n**設定 LINE Channel Access Token**\n\n1. **取得 Channel Access Token**\n   - 要到[LINE Developers Console]\n\n2. **在 n8n 中新增憑證**\n   - 點擊「Credential to connect with」\n   - 選擇「Create New」→「HTTP Header Auth」\n   - **Name**: `Authorization`\n   - **Value**: `Bearer YOUR_CHANNEL_ACCESS_TOKEN`\n   - 將 `YOUR_CHANNEL_ACCESS_TOKEN` 替換成剛才複製的 Token\n   - 儲存憑證\n\n### 📝 注意事項\n- 與「reply」節點使用**相同的憑證**\n- Token 格式必須是: `Bearer ` + 你的 Token (注意 Bearer 後面有空格)\n- 如果出現 401 錯誤,檢查 Token 是否正確",
+        "height": 720,
+        "width": 272
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -128,
+        1856
+      ],
+      "typeVersion": 1,
+      "id": "2ea81316-9ac3-4f1a-8144-d0a7256041f7",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "\n\n\n\n\n\n\n\n\n\n\n\n\n### 功能\n- 將識別出的名片資料儲存到 Google Sheets\n- 使用「手機電話」作為唯一識別\n- 如果電話已存在則**更新**,否則**新增**\n\n### ⚠️ 必須設定\n\n**1. 新增 Google Sheets OAuth2 憑證**\n**2. 選擇文件與工作表**\n   - **Document**: 選擇你的名片資料庫 Sheets\n   - **Sheet Name**: 選擇工作表\n\n**3. 設定欄位對應**\n   - **Operation**: Append or Update\n   - **Matching Columns**: `手機電話` (作為唯一識別)\n   - 確認所有欄位對應正確\n\n### 📋 建議的 Sheets 欄位\n\n在 Google Sheets 中建立以下欄位(第一行):\n```\n公司名稱 | 姓名 | 職稱 | 手機電話 | 公司電話 | 地址 | email | 最後更新時間 | 修改人\n```\n\n### 📝 注意事項\n- 使用「手機電話」作為唯一識別,相同電話會更新而非重複新增\n- 如果要改用其他欄位作為識別(如 email),修改「Matching Columns」\n- 確保 Sheets 的欄位名稱與此節點的設定**完全一致**\n- 第一次使用前,建議先手動在 Sheets 中加入欄位標題",
+        "height": 944,
+        "width": 320
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        544,
+        1856
+      ],
+      "typeVersion": 1,
+      "id": "4cc7047d-7b7e-438e-89da-7169ca6168d5",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "content": "### 功能\n- 將處理結果回覆給 LINE 用戶\n- 使用 LINE Messaging API\n\n### ⚠️ 必須設定\n\n**設定 LINE Channel Access Token**\n\n使用與「取得圖片1」**相同的憑證**\n\n\n### 📝 注意事項\n- **不需要修改** URL 和 Body 的設定\n- 如果出現 401 錯誤,檢查憑證是否正確設定\n- 如果出現 400 錯誤,檢查 replyToken 是否有效\n- replyToken 只能使用一次,不能重複回覆\n",
+        "height": 592,
+        "width": 320
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1040,
+        1296
+      ],
+      "typeVersion": 1,
+      "id": "e4c51d56-2884-4cd2-b77a-ec06edb020f6",
+      "name": "Sticky Note4"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "AI Agent (查詢與對話)": {
+      "main": [
+        [
+          {
+            "node": "格式化回覆1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "判斷訊息類型1": {
+      "main": [
+        [
+          {
+            "node": "AI Agent (查詢與對話)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "取得圖片1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "取得圖片1": {
+      "main": [
+        [
+          {
+            "node": "Gemini OCR 識別1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini OCR 識別1": {
+      "main": [
+        [
+          {
+            "node": "解析 OCR 結果1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "解析 OCR 結果1": {
+      "main": [
+        [
+          {
+            "node": "儲存到 Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "格式化回覆1": {
+      "main": [
+        [
+          {
+            "node": "reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini 模型1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent (查詢與對話)",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory2": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent (查詢與對話)",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "儲存到 Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "格式化回覆1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LINE Webhook 觸發器": {
+      "main": [
+        [
+          {
+            "node": "判斷訊息類型1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet in Google Sheets": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent (查詢與對話)",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "315ca6ad-603d-4e8b-9576-b17ab83f844f",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "173e90798b194ce1f2371138ef6c7e84ef25a71b3ff7a589cf1cbb5017d96a74"
+  },
+  "id": "asqDnmfA1mu1iRZI",
+  "tags": []
+}

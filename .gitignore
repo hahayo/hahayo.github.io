@@ -1,0 +1,17 @@
+# Claude Code local settings
+.claude/
+
+# Spec documents (not needed for deployment)
+portfolio-spec.md
+
+# Original video file (already copied to assets/videos)
+螢幕錄製*.mp4
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~

@@ -1,0 +1,482 @@
+{
+  "name": "哈哈的todo幫手",
+  "nodes": [
+    {
+      "parameters": {
+        "resource": "image",
+        "operation": "analyze",
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.0-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.0-flash"
+        },
+        "text": "=你是一個專業的待辦事項管理助手,現在時間是 {{ $now.toISO() }}。\n今天的日期是 {{ $now.toFormat('yyyy-MM-dd') }}\n【使用者身份】{{ $('訊息類型判斷1').item.json.userName }}\n請分析這張圖片(可能是 LINE 對話截圖、會議記錄、郵件等),從中提取所有需要處理的待辦事項。\n請以純 JSON 格式回覆,回傳任務陣列:\n{\n\"tasks\": [\n{\n\"subject\": \"完整清晰的任務描述\",\n\"content\": \"補充細節資訊(選填)\",\n\"due\": \"YYYY-MM-DD 或 null\",\n\"reminder\": \"YYYY-MM-DD HH:mm:ss 或 null\"\n}\n]\n}\n【重要】請提取圖片中的所有待辦事項,不限數量\n【LINE 對話截圖分析重點】\n\n任務過濾規則(最重要):\n\n✅ 包含: 上述使用者身份中的任一名稱 + 動詞 → 這是要提取的任務\n✅ 包含: 沒有指定對象的待辦事項 → 預設是要提取的任務\n❌ 排除: 其他人名 + 動詞 → 不要提取\n❌ 排除: 只是陳述事實,沒有要求做事的訊息 → 不要提取\n\n\n範例說明:\n\n「阿扁,請安排下週車趟」 → ❌ 不提取(是叫阿扁做)\n「Haha,明天給我交報告」 → ✅ 提取(使用者身份中包含Haha)\n「明天要開會」(沒指定對象) → ✅ 提取(預設任務)\n「小短健身時不要再看妹子」 → ❌ 不提取(是提醒小短)\n\n\n逐條檢查每個訊息,可能包含多個任務:\n\n一個訊息可能提到多件事\n不同人的訊息可能指派不同任務\n注意時間順序和上下文關係\n\n\n任務識別標誌:\n\n行動詞彙: 「記得」、「要」、「需要」、「麻煩」、「請」、「交」、「給」\n時間標記: 「明天」、「下週」、「月底前」\n承諾回應: 「好」、「OK」、「沒問題」、「會處理」\n列舉項目: 「1.」、「2.」、「•」、「・」、「-」\n\n\n\n【Subject 撰寫原則】\n每個任務的 subject 都要獨立完整,能單獨理解:\n✓ 「準備週五產品會議簡報」\n✓ 「列印週五會議資料20份」\n✓ 「提交1-9月KPI成果報告」\n【任務關聯處理】\n\n相關任務可在 content 中註明關聯\n例如: content: 「此為週五產品會議準備事項之一」\n\n【時間解析規則 - 重要】\n\n到期日期 (due) - 只需要日期,不要時間:\n\n「明天」 → 2025-10-20\n「下週」 → 下週一的日期\n「月底前」 → 當月最後一天\n「下週五」 → 下週五的日期\n「10月20日」 → 2025-10-20\n\n\n提醒時間 (reminder) - 需要完整日期+時間:\n\n當使用者說「X點提醒」時,reminder就是X點,不要自動提前!\n「早上9點提醒」 → YYYY-MM-DD 09:00:00 (就是9點,不是8:30)\n「晚上六點提醒」 → YYYY-MM-DD 18:00:00 (就是18點,不是17:30)\n「下午3點提醒」 → YYYY-MM-DD 15:00:00 (就是15點,不是14:30)\n「提前1小時提醒」 → 才需要計算提前時間\n沒提到提醒 → null\n只有當任務本身有具體時間(如「下午3點開會」),且沒說提醒時間,才自動提前30分鐘\n\n\n範例:\n\n「明天要買菜」 → due: 2025-10-20, reminder: null\n「明天要買菜,早上9點提醒」 → due: 2025-10-20, reminder: 2025-10-20 09:00:00\n「提醒我今天晚上六點要讀讀書會的書」 → due: 2025-10-19, reminder: 2025-10-19 18:00:00\n「明天下午3點開會」(沒說提醒時間) → due: 2025-10-20, reminder: 2025-10-20 14:30:00\n「下週一交報告」 → due: 2025-10-21, reminder: null\n\n\n\n【優先順序提示】(在 content 中標註)\n\n緊急: 「[緊急]」\n重要: 「[重要]」\n可選: 「[選擇性]」\n\n【範例 - 正確過濾】\n圖片內容:\n「阿扁,請安排矽品二林廠下週車趟\nHaha,明天下班前給我交1-9月kpi成果\n小短健身時不要再看妹子,好好練,好嗎?」\n正確輸出:\n{\n\"tasks\": [\n{\n\"subject\": \"提交1-9月KPI成果報告\",\n\"content\": \"\",\n\"due\": \"2025-10-20\",\n\"reminder\": \"2025-10-20 15:00:00\"\n}\n]\n}\n如果圖片中沒有任何待辦事項,回傳:\n{\n\"tasks\": []\n}\n只輸出 JSON,不要任何說明文字。",
+        "inputType": "binary",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1,
+      "position": [
+        -336,
+        -16
+      ],
+      "id": "e236e890-c83b-4926-bfaa-d093a1a85113",
+      "name": "Gemini 分析圖片內容",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "1h781B9U5c9IZuiP",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.0-flash-lite",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.0-flash-lite"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "={{ $json.event.message.text }}"
+            }
+          ]
+        },
+        "jsonOutput": true,
+        "options": {
+          "systemMessage": "=你是一個專業的待辦事項管理助手,現在時間是 {{ $now.toISO() }}。\n今天的日期是 {{ $now.toFormat('yyyy-MM-dd') }}\n\n【使用者身份】{{ $('訊息類型判斷1').item.json.userName }}\n\n請從使用者的文字訊息中提取所有待辦事項。\n\n請以純 JSON 格式回覆:\n{\n  \"tasks\": [\n    {\n      \"subject\": \"完整清晰的任務描述\",\n      \"content\": \"補充細節(選填)\",\n      \"due\": \"YYYY-MM-DD 或 null\",\n      \"reminder\": \"YYYY-MM-DD HH:mm:ss 或 null\"\n    }\n  ]\n}\n\n【任務過濾規則】\n1. 如果訊息中提到其他人名字 + 動詞:\n   - ✅ 提取: 上述使用者身份中的任一名稱 + 動詞\n   - ❌ 排除: 其他人名 + 動詞\n   \n2. 如果沒有指定對象,預設是使用者的任務\n\n3. 範例:\n   - 「阿扁要去開會,我明天要交報告」 → 只提取「交報告」\n   - 「明天開會,記得帶資料」 → 提取2個任務\n   - 「小明去買咖啡」 → 不提取(是叫小明做)\n\n【多任務識別】\n1. 連接詞分隔:\n   - 「還有」、「另外」、「還要」、「以及」、「順便」\n   - 範例: 「明天開會,還要記得帶報告」 → 2個任務\n\n2. 標點符號分隔:\n   - 逗號、句號、分號分隔的獨立事項\n   - 範例: 「買牛奶、麵包、雞蛋」 → 可合併為1個購物任務或分為3個\n\n3. 時間不同的任務:\n   - 「早上開會,下午拜訪客戶」 → 2個任務\n\n4. 列舉格式:\n   - 數字或符號開頭的項目\n   - 每項都是獨立任務\n\n【智慧合併原則】\n- 同類型小任務可合併:\n  - 「買牛奶、買麵包」 → 「採買:牛奶、麵包」\n- 不同性質任務須分開:\n  - 「開會、買東西」 → 2個獨立任務\n\n【時間解析規則 - 重要】\n1. 到期日期 (due) - 只需要日期,不要時間:\n   - 「明天」 → 2025-10-20\n   - 「下週」 → 下週一的日期\n   - 「月底前」 → 當月最後一天\n   - 「下週五」 → 下週五的日期\n\n2. 提醒時間 (reminder) - 需要完整日期+時間:\n   - **當使用者說「X點提醒」時,reminder就是X點,不要自動提前!**\n   - 「早上9點提醒」 → YYYY-MM-DD 09:00:00 (就是9點,不是8:30)\n   - 「晚上六點提醒」 → YYYY-MM-DD 18:00:00 (就是18點,不是17:30)\n   - 「下午3點提醒」 → YYYY-MM-DD 15:00:00 (就是15點,不是14:30)\n   - 「提前1小時提醒」 → 才需要計算提前時間\n   - 沒提到提醒 → null\n   - **只有當任務本身有具體時間(如「下午3點開會」),且沒說提醒時間,才自動提前30分鐘**\n\n3. 範例:\n   - 「明天要買菜」 → due: 2025-10-20, reminder: null\n   - 「明天要買菜,早上9點提醒」 → due: 2025-10-20, reminder: 2025-10-20 09:00:00\n   - 「提醒我今天晚上六點要讀讀書會的書」 → due: 2025-10-19, reminder: 2025-10-19 18:00:00\n   - 「今天要讀讀書會的書 晚上六點提醒我」 → due: 2025-10-19, reminder: 2025-10-19 18:00:00\n   - 「明天下午3點開會」(沒說提醒時間) → due: 2025-10-20, reminder: 2025-10-20 14:30:00\n   - 「明天下午3點開會,提前1小時提醒」 → due: 2025-10-20, reminder: 2025-10-20 14:00:00\n   - 「下週一交報告」 → due: 2025-10-21, reminder: null\n\n【範例 - 正確過濾】\n輸入: 「阿扁要去安排車,Haha你明天要做三件事:1.早上9點開會 2.下午2點看牙醫 3.晚上7點接小孩」\n\n輸出:\n{\n  \"tasks\": [\n    {\n      \"subject\": \"參加早晨會議\",\n      \"content\": \"\",\n      \"due\": \"2025-10-20\",\n      \"reminder\": \"2025-10-20 08:30:00\"\n    },\n    {\n      \"subject\": \"牙醫門診預約\",\n      \"content\": \"\",\n      \"due\": \"2025-10-20\",\n      \"reminder\": \"2025-10-20 13:30:00\"\n    },\n    {\n      \"subject\": \"接送孩子\",\n      \"content\": \"\",\n      \"due\": \"2025-10-20\",\n      \"reminder\": \"2025-10-20 18:30:00\"\n    }\n  ]\n}\n\n輸入: 「明天要買菜,早上9點提醒」\n\n輸出:\n{\n  \"tasks\": [\n    {\n      \"subject\": \"買菜\",\n      \"content\": \"\",\n      \"due\": \"2025-10-20\",\n      \"reminder\": \"2025-10-20 09:00:00\"\n    }\n  ]\n}\n\n輸入: 「提醒我今天晚上六點要讀讀書會的書」\n\n輸出:\n{\n  \"tasks\": [\n    {\n      \"subject\": \"閱讀讀書會的書\",\n      \"content\": \"\",\n      \"due\": \"2025-10-19\",\n      \"reminder\": \"2025-10-19 18:00:00\"\n    }\n  ]\n}\n\n如果訊息中沒有待辦事項,回傳:\n{\n  \"tasks\": []\n}\n\n只輸出 JSON。",
+          "maxOutputTokens": 256,
+          "temperature": 0.1
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1,
+      "position": [
+        -416,
+        176
+      ],
+      "id": "ade5abac-d870-4d1a-a0c7-cb2919410985",
+      "name": "Gemini 分析文字訊息",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "1h781B9U5c9IZuiP",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.0-flash-lite",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.0-flash-lite"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "={{ $json.content.parts[0].text }}"
+            }
+          ]
+        },
+        "jsonOutput": true,
+        "options": {
+          "systemMessage": "=【重要】請將所有簡體中文轉換為繁體中文(台灣用語)後再處理。\n\n你是一個專業的待辦事項管理助手,現在時間是 {{ $now.toISO() }}。\n今天的日期是 {{ $now.toFormat('yyyy-MM-dd') }}\n\n【使用者身份】{{ $('訊息類型判斷1').item.json.userName }}\n\n請從語音轉文字的內容中提取待辦事項(注意:語音辨識可能有錯字或缺少標點,且可能是簡體中文)。\n\n請以純 JSON 格式回覆(使用繁體中文):\n{\n  \"tasks\": [\n    {\n      \"subject\": \"完整清晰的任務描述(繁體中文)\",\n      \"content\": \"補充細節(選填,繁體中文)\",\n      \"due\": \"YYYY-MM-DD 或 null\",\n      \"reminder\": \"YYYY-MM-DD HH:mm:ss 或 null\"\n    }\n  ]\n}\n\n【語音內容特殊處理】\n1. 容錯處理:\n   - 自動將簡體中文轉為繁體中文\n   - 忽略語氣詞: 「呃」、「嗯」、「啊」、「喔」\n   - 修正常見錯字: 「在」vs「再」、「的地得」\n   - 自動斷句理解(語音可能無標點)\n\n2. 口語轉書面語:\n   - 「欸你記得...」 → 提取核心任務\n   - 「那個...就是...」 → 識別實際內容\n   - 「幫我一下...」 → 轉為具體任務\n\n3. Subject 優化:\n   - 整理零散的口語表達\n   - 提煉核心行動項目\n   - 確保任務描述完整且專業\n\n【台灣口語時間轉換】\n- 「等一下」/「等等」/「待會」 → 1-2小時後\n- 「早點」/「早一點」 → 提前1小時\n- 「趕快」/「馬上」 → 30分鐘內\n- 「有空再...」 → 不設定時間(null)\n\n數字讀音轉換:\n- 「三點」/「三點鐘」 → 15:00:00(依上下文判斷)\n- 「十點半」 → 10:30:00 或 22:30:00\n- 「九點一刻」 → 09:15:00\n- 「六點四十五」 → 06:45:00 或 18:45:00\n- 「上午11點」 → 11:00:00\n- 「下午3點」 → 15:00:00\n\n【智慧判斷上下午】\n根據常理判斷:\n- 「吃早餐」 → 上午\n- 「午休後」 → 下午\n- 「下班後」 → 傍晚/晚上\n- 「睡前」 → 晚上21:00-23:00\n\n【Content 內容萃取】\n從口語中提取:\n- 參與人: 「跟誰」、「和誰」\n- 地點: 「在哪」、「去哪」\n- 原因: 「因為」、「為了」\n- 備註: 「順便」、「記得要」\n\n【時間解析規則 - 重要】\n1. 到期日期 (due) - 只需要日期,不要時間:\n   - 「明天」 → 2025-10-20\n   - 「下週」 → 下週一的日期\n   - 「週末」 → 本週六的日期\n\n2. 提醒時間 (reminder) - 需要完整日期+時間:\n   - **當使用者說「X點提醒」時,reminder就是X點,不要自動提前!**\n   - 「上午11點提醒」 → YYYY-MM-DD 11:00:00 (就是11點,不是10:30)\n   - 「下午3點提醒」 → YYYY-MM-DD 15:00:00 (就是15點,不是14:30)\n   - 「晚上六點提醒」 → YYYY-MM-DD 18:00:00 (就是18點,不是17:30)\n   - 「提前1小時提醒」 → 才需要計算提前時間\n   - 沒提到提醒 → null\n   - **只有當任務本身有具體時間(如「下午3點開會」),且沒說提醒時間,才自動提前30分鐘**\n\n【範例】\n語音輸入: 「明天上午11點提醒我和老闆吃午餐」\n輸出:\n{\n  \"tasks\": [\n    {\n      \"subject\": \"與老闆共進午餐\",\n      \"content\": \"\",\n      \"due\": \"2025-10-20\",\n      \"reminder\": \"2025-10-20 11:00:00\"\n    }\n  ]\n}\n\n語音輸入: 「提醒我今天晚上六點要讀讀書會的書」\n輸出:\n{\n  \"tasks\": [\n    {\n      \"subject\": \"閱讀讀書會的書\",\n      \"content\": \"\",\n      \"due\": \"2025-10-19\",\n      \"reminder\": \"2025-10-19 18:00:00\"\n    }\n  ]\n}\n\n語音輸入: 「明天下午3點開會」(沒說提醒時間)\n輸出:\n{\n  \"tasks\": [\n    {\n      \"subject\": \"參加會議\",\n      \"content\": \"\",\n      \"due\": \"2025-10-20\",\n      \"reminder\": \"2025-10-20 14:30:00\"\n    }\n  ]\n}\n\n語音輸入: 「明天下午3點開會,提前1小時提醒」\n輸出:\n{\n  \"tasks\": [\n    {\n      \"subject\": \"參加會議\",\n      \"content\": \"\",\n      \"due\": \"2025-10-20\",\n      \"reminder\": \"2025-10-20 14:00:00\"\n    }\n  ]\n}\n\n如果語音內容不含待辦事項(如問候、聊天),回傳:\n{\n  \"tasks\": []\n}\n\n只輸出 JSON。",
+          "maxOutputTokens": 256,
+          "temperature": 0.1
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1,
+      "position": [
+        -416,
+        368
+      ],
+      "id": "c787f0bf-857b-429b-b828-c1fd7d37bd63",
+      "name": "Gemini 分析語音轉文字後訊息",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "1h781B9U5c9IZuiP",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "audio",
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.0-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.0-flash"
+        },
+        "inputType": "binary",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1,
+      "position": [
+        -640,
+        368
+      ],
+      "id": "0ec43d8d-58ca-402c-bca0-596eb8e3c018",
+      "name": "Gemini 語音轉文字",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "1h781B9U5c9IZuiP",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "haha1012",
+        "options": {}
+      },
+      "id": "9ade8ed1-6ffa-418b-85c4-075fc41a3766",
+      "name": "LINE Webhook 觸發器1",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -1536,
+        176
+      ],
+      "webhookId": "721dd7b3-0c85-4a1b-8d5e-9515cb5886f1"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// 取得LINE訊息內容\nconst event = $json.body.events[0];\nconst messageType = event.message.type;\nconst userId = event.source.userId;\nconst replyToken = event.replyToken;\n\n// 根據訊息類型設定不同處理路徑\nlet route = \"text\";\nif (messageType === \"image\") {\n  route = \"image\";\n} else if (messageType === \"audio\") {\n  route = \"audio\";\n}\n\nreturn {\n  json: {\n    event,\n    messageType,\n    userId,\n    replyToken,\n    route,\n    messageId: event.message.id,\n    timestamp: event.timestamp,\n    userName: \"黃奕儒、哈哈、Haha、haha\"\n  }\n};"
+      },
+      "id": "8f474f9c-dc7e-42d0-9357-4873446e7d91",
+      "name": "訊息類型判斷1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1312,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{ $json.event.message.type }}",
+        "rules": {
+          "rules": [
+            {
+              "value2": "text",
+              "output": 1
+            },
+            {
+              "value2": "image"
+            },
+            {
+              "value2": "audio",
+              "output": 2
+            }
+          ]
+        }
+      },
+      "id": "467ea712-16ac-4a8d-bdf0-6a1fc0e48feb",
+      "name": "路由分配1",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [
+        -1088,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://api-data.line.me/v2/bot/message/{{$json.messageId}}/content",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "f4596fcc-aa08-4676-8123-b54d1983047a",
+      "name": "取得圖片內容1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -640,
+        -16
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "7r1KaKeljG2wL19f",
+          "name": "Header Auth Account(哈哈哈哈)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://api-data.line.me/v2/bot/message/{{$json.messageId}}/content",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "4a71e8a3-87d4-4a3d-8e84-9f54b164d7e0",
+      "name": "取得語音內容1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -864,
+        368
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "7r1KaKeljG2wL19f",
+          "name": "Header Auth Account(哈哈哈哈)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Mode: Run Once for Each Item\n// 解析Gemini回應並準備Microsoft To Do任務\n\nlet taskData;\n\ntry {\n  // 處理 Gemini 的回應結構\n  let content;\n  \n  // 檢查各種可能的 Gemini 回應格式\n  if (Array.isArray($json) && $json[0]?.content?.parts?.[0]?.text) {\n    content = $json[0].content.parts[0].text;\n  } else if ($json.content?.parts?.[0]?.text) {\n    content = $json.content.parts[0].text;\n  } else if ($json.candidates && Array.isArray($json.candidates)) {\n    content = $json.candidates[0]?.content?.parts?.[0]?.text;\n  } else if ($json.parts?.[0]?.text) {\n    content = $json.parts[0].text;\n  } else if (typeof $json === 'string') {\n    content = $json;\n  } else {\n    content = $json.text || $json.message || JSON.stringify($json);\n  }\n  \n  console.log(\"提取的內容:\", content);\n  \n  // 清理並解析 JSON\n  if (typeof content === 'string') {\n    const cleanedContent = content\n      .replace(/```json\\s*/gi, '')\n      .replace(/```\\s*/g, '')\n      .trim();\n    \n    console.log(\"清理後的內容:\", cleanedContent);\n    taskData = JSON.parse(cleanedContent);\n  } else if (typeof content === 'object') {\n    taskData = content;\n  }\n  \n  console.log(\"解析後的任務資料:\", taskData);\n  \n} catch (error) {\n  console.error(\"解析錯誤:\", error);\n  console.log(\"原始資料:\", JSON.stringify($json, null, 2));\n  \n  return {\n    json: {\n      hasTask: false,\n      message: \"無法從訊息中提取待辦事項\",\n      error: error.message\n    }\n  };\n}\n\n// 如果是多任務格式，取第一個\nif (taskData && taskData.tasks && Array.isArray(taskData.tasks)) {\n  if (taskData.tasks.length === 0) {\n    return {\n      json: {\n        hasTask: false,\n        message: \"訊息中沒有找到待辦事項\"\n      }\n    };\n  }\n  taskData = taskData.tasks[0];\n  console.log(\"偵測到多任務格式，處理第一個任務\");\n}\n\n// 檢查是否有有效的任務\nif (!taskData || !taskData.subject || taskData.subject === null) {\n  return {\n    json: {\n      hasTask: false,\n      message: \"訊息中沒有找到待辦事項\",\n      debug: \"subject 欄位不存在或為 null\"\n    }\n  };\n}\n\n// 準備 Microsoft To Do 格式的資料\nconst result = {\n  hasTask: true,\n  title: taskData.subject,\n  body: {\n    content: taskData.content || \"\",\n    contentType: \"text\"\n  },\n  importance: \"normal\",\n  categories: [],\n};\n\n// 處理到期日期 - 使用 UTC 中午,確保在所有時區都顯示正確日期\nif (taskData.due) {\n  // Gemini 回傳格式: \"2025-10-17\"\n  // 轉換為 UTC 中午時間,避免時區問題\n  const formattedDue = taskData.due + 'T12:00:00.0000000';\n  \n  result.dueDateTime = {\n    dateTime: formattedDue,\n    timeZone: \"UTC\"\n  };\n  result.dueTaiwanTime = taskData.due;\n}\n\n// 處理提醒時間 - 使用台北時區\nif (taskData.reminder) {\n  const formattedReminder = taskData.reminder.replace(' ', 'T') + '.0000000';\n  result.isReminderOn = true;\n  result.reminderDateTime = {\n    dateTime: formattedReminder,\n    timeZone: \"Asia/Taipei\"\n  };\n  result.reminderTaiwanTime = taskData.reminder;\n}\n\n// 從訊息類型判斷節點取得額外資訊\ntry {\n  const messageInfo = $('訊息類型判斷1').item.json;\n  result.userId = messageInfo.userId || 'unknown';\n  result.replyToken = messageInfo.replyToken;\n  result.messageType = messageInfo.messageType;\n  result.source = messageInfo.route;\n} catch (e) {\n  console.log(\"無法取得訊息資訊:\", e.message);\n  result.userId = 'unknown';\n  result.source = 'unknown';\n}\n\n// 加入處理時間戳記\nresult.processedAt = new Date().toISOString();\n\n// 生成 LINE 回覆訊息\nlet replyText = `✅ 待辦事項已建立\\n\\n📝 ${result.title}`;\n\nif (taskData.content) {\n  replyText += `\\n📄 說明：${taskData.content}`;\n}\n\nif (taskData.due) {\n  // 只顯示日期\n  try {\n    const [year, month, day] = taskData.due.split('-');\n    replyText += `\\n📅 到期：${month}/${day}`;\n  } catch (e) {\n    replyText += `\\n📅 到期：${taskData.due}`;\n  }\n}\n\nif (taskData.reminder) {\n  try {\n    const [datePart, timePart] = taskData.reminder.split(' ');\n    const [year, month, day] = datePart.split('-');\n    const [hour, minute] = timePart.split(':');\n    \n    replyText += `\\n⏰ 提醒：${month}/${day} ${hour}:${minute}`;\n  } catch (e) {\n    replyText += `\\n⏰ 提醒：${taskData.reminder}`;\n  }\n}\n\nresult.replyMessage = replyText;\n\n// 輸出偵錯資訊\nconsole.log(\"最終輸出:\", {\n  title: result.title,\n  dueDateTime: result.dueDateTime,\n  reminderDateTime: result.reminderDateTime,\n  replyMessage: result.replyMessage\n});\n\n// 回傳單一物件\nreturn {\n  json: result\n};"
+      },
+      "id": "5cd7d257-7804-488c-aea2-2a773ca8b9cc",
+      "name": "處理分析結果1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -16,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.line.me/v2/bot/message/reply",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "f24111ac-0390-4c8f-b337-1931ad5a6dfc",
+      "name": "回覆LINE訊息結果1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        864,
+        176
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "7r1KaKeljG2wL19f",
+          "name": "Header Auth Account(哈哈哈哈)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "taskListId": "AAMkADAxMDc2NjQ3LTA2MjEtNDQzZC1hOTczLTBiNTlhMTA3YTcwMAAuAAAAAADq28zB16HATaS_2IHsHg-1AQDA7LaQIYu1SY-OEypYbO7ZAAbD4gUyAAA=",
+        "title": "={{ $json.title }}",
+        "additionalFields": {
+          "content": "={{ $json.body.content }}",
+          "dueDateTime": "={{ $json.dueDateTime.dateTime }}",
+          "reminderDateTime": "={{ $json.reminderDateTime.dateTime }}"
+        }
+      },
+      "type": "n8n-nodes-base.microsoftToDo",
+      "typeVersion": 1,
+      "position": [
+        416,
+        176
+      ],
+      "id": "95f86c45-d379-4900-923e-e6fe12aa60f9",
+      "name": "Create a task",
+      "alwaysOutputData": false,
+      "executeOnce": false,
+      "retryOnFail": false,
+      "notesInFlow": false,
+      "credentials": {
+        "microsoftToDoOAuth2Api": {
+          "id": "gDz7VIVSNDHfJ4FI",
+          "name": "Microsoft To Do account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 取得建立的任務資訊\nconst task = $input.first().json;\nconst replyToken = $('LINE Webhook 觸發器1').item.json.body.events[0].replyToken;\n\n// 檢查任務是否成功建立\nif (!task.id) {\n  return {\n    json: {\n      replyToken: replyToken,\n      messages: [\n        {\n          type: \"text\",\n          text: \"❌ 任務建立失敗，請稍後再試\"\n        }\n      ]\n    }\n  };\n}\n\n// 建立成功訊息\nlet replyText = `✅ 待辦事項已建立\\n\\n📝 ${task.title}`;\n\n// 加入內容描述\nif (task.body && task.body.content) {\n  replyText += `\\n📄 ${task.body.content}`;\n}\n\n// 加入到期日 - 只顯示日期,不顯示時間\nif (task.dueDateTime && task.dueDateTime.dateTime) {\n  try {\n    const utcDate = new Date(task.dueDateTime.dateTime + 'Z');\n    const taipeiDate = new Date(utcDate.getTime() + (8 * 60 * 60 * 1000));\n    \n    const month = String(taipeiDate.getMonth() + 1).padStart(2, '0');\n    const day = String(taipeiDate.getDate()).padStart(2, '0');\n    \n    replyText += `\\n📅 到期：${month}/${day}`;\n  } catch (e) {\n    console.error(\"日期格式化錯誤:\", e);\n  }\n}\n\n// 加入提醒 - 顯示日期+時間\nif (task.reminderDateTime && task.reminderDateTime.dateTime) {\n  try {\n    const utcDate = new Date(task.reminderDateTime.dateTime + 'Z');\n    const taipeiDate = new Date(utcDate.getTime() + (8 * 60 * 60 * 1000));\n    \n    const month = String(taipeiDate.getMonth() + 1).padStart(2, '0');\n    const day = String(taipeiDate.getDate()).padStart(2, '0');\n    const hour = String(taipeiDate.getHours()).padStart(2, '0');\n    const minute = String(taipeiDate.getMinutes()).padStart(2, '0');\n    \n    replyText += `\\n⏰ 提醒：${month}/${day} ${hour}:${minute}`;\n  } catch (e) {\n    console.error(\"提醒時間格式化錯誤:\", e);\n  }\n}\n\n// 加入重要性標記\nif (task.importance === 'high') {\n  replyText += `\\n⚠️ 重要性：高`;\n}\n\n// 回傳 LINE API 格式\nreturn {\n  json: {\n    replyToken: replyToken,\n    messages: [\n      {\n        type: \"text\",\n        text: replyText\n      }\n    ]\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        176
+      ],
+      "id": "faaf7f7c-41e4-4615-add8-c3e55db0a349",
+      "name": "準備回覆訊息"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Gemini 分析圖片內容": {
+      "main": [
+        [
+          {
+            "node": "處理分析結果1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini 分析文字訊息": {
+      "main": [
+        [
+          {
+            "node": "處理分析結果1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini 分析語音轉文字後訊息": {
+      "main": [
+        [
+          {
+            "node": "處理分析結果1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini 語音轉文字": {
+      "main": [
+        [
+          {
+            "node": "Gemini 分析語音轉文字後訊息",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LINE Webhook 觸發器1": {
+      "main": [
+        [
+          {
+            "node": "訊息類型判斷1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "訊息類型判斷1": {
+      "main": [
+        [
+          {
+            "node": "路由分配1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "路由分配1": {
+      "main": [
+        [
+          {
+            "node": "取得圖片內容1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Gemini 分析文字訊息",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "取得語音內容1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "取得圖片內容1": {
+      "main": [
+        [
+          {
+            "node": "Gemini 分析圖片內容",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "取得語音內容1": {
+      "main": [
+        [
+          {
+            "node": "Gemini 語音轉文字",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "處理分析結果1": {
+      "main": [
+        [
+          {
+            "node": "Create a task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a task": {
+      "main": [
+        [
+          {
+            "node": "準備回覆訊息",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "準備回覆訊息": {
+      "main": [
+        [
+          {
+            "node": "回覆LINE訊息結果1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Taipei",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "63ca0a15-206f-49a8-b2dd-5ed4a647b59a",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "173e90798b194ce1f2371138ef6c7e84ef25a71b3ff7a589cf1cbb5017d96a74"
+  },
+  "id": "Cit4OTNBu8Bn088S",
+  "tags": []
+}
