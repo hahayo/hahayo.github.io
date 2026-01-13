@@ -44,6 +44,7 @@
   {
     "id": "recycling-bot",
     "category": "ai",
+    "hidden": true,
     "name": "回收辨識機器人",
     "desc": "AI 圖片/語言辨識垃圾分類",
     "metrics": ["圖片辨識", "分類建議"],

@@ -35,7 +35,8 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const response = await fetch('assets/data/projects.json');
             if (!response.ok) throw new Error('Failed to load projects');
-            projects = await response.json();
+            const allProjects = await response.json();
+            projects = allProjects.filter(p => !p.hidden);
             renderProjects(projects);
         } catch (error) {
             console.error('Error loading projects:', error);
