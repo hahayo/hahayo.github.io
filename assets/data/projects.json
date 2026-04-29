@@ -1,10 +1,24 @@
 [
   {
+    "id": "df-plugin",
+    "category": "github",
+    "name": "Claude Plugin Marketplace",
+    "desc": "自製 Claude Code plugins 集合，可一鍵安裝",
+    "metrics": ["7 支自製 plugin", "marketplace 一鍵安裝"],
+    "tags": ["Claude Code", "Plugin", "Marketplace", "Skills"],
+    "cover": "df-plugin-cover.png",
+    "images": ["df-plugin-cover.png"],
+    "video": "",
+    "github": "https://github.com/df-haha/df-plugin",
+    "workflow": "",
+    "details": "【內容】自製 Claude Code plugins 集合，透過 marketplace 一鍵安裝。\n\n【可用 Plugin】\n• first-principles — 第一性原理思考框架，自動拆解問題到最基本的事實與假設\n• markitdown — PDF/PPT/Word/Excel 等檔案轉 Markdown\n• deep-research-ryan — 多層次深度研究引擎，自動調度 subagents 執行多階段研究\n• fact-check — 5 層文檔事實查核系統\n• daily-work-log — 跨專案工作日誌產生器，可整合 Claude Code / Codex / Gemini session\n• ai-review — Codex / Gemini AI 二次審查，支援單審或雙重對審\n• evaluate-business-idea — 軟體/SaaS/服務點子的五維深度系統評估框架\n\n【安裝方式】\nclaude plugin marketplace add df-haha/df-plugin\nclaude plugin install <plugin-name>"
+  },
+  {
     "id": "todo-helper",
     "category": "n8n",
     "name": "Todo 幫手",
     "desc": "LINE Bot + AI 自動建立待辦事項",
-    "metrics": ["支援圖片/語音", "自動同步 To Do"],
+    "metrics": ["支援圖片/語音", "自動同步 To Do", "workflow 可下載"],
     "tags": ["n8n", "LINE", "Gemini AI", "Microsoft To Do"],
     "cover": "todo-helper-cover.png",
     "images": ["todo-helper-cover.png"],
@@ -18,7 +32,7 @@
     "category": "n8n",
     "name": "名片助手",
     "desc": "LINE Bot + OCR 智慧名片管理",
-    "metrics": ["OCR 識別", "AI 查詢"],
+    "metrics": ["OCR 識別", "AI 查詢", "workflow 可下載"],
     "tags": ["n8n", "LINE", "Gemini AI", "Google Sheets"],
     "cover": "business-card-cover.png",
     "images": ["business-card-cover.png"],
@@ -30,6 +44,7 @@
   {
     "id": "nutrition-assistant",
     "category": "n8n",
+    "hidden": true,
     "name": "飲控助手",
     "desc": "AI 食物辨識 + 飲食管理",
     "metrics": ["圖片辨識", "營養分析"],

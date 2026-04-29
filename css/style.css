@@ -423,6 +423,11 @@ button {
     margin-bottom: var(--space-xs);
 }
 
+.highlight-title--compact {
+    font-size: var(--font-size-xl);
+    white-space: nowrap;
+}
+
 .highlight-desc {
     color: var(--color-text-muted);
 }
